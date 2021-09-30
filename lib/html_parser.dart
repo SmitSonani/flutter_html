@@ -58,6 +58,7 @@ class HtmlParser extends StatelessWidget {
   final List<String> tagsList;
   final NavigationDelegate? navigationDelegateForIframe;
   final OnTap? _onAnchorTap;
+  final TextSelectionControls? selectionControls;
 
   HtmlParser({
     required this.key,
@@ -75,6 +76,7 @@ class HtmlParser extends StatelessWidget {
     required this.imageRenders,
     required this.tagsList,
     required this.navigationDelegateForIframe,
+    this.selectionControls
   })  : this._onAnchorTap = onAnchorTap != null
           ? onAnchorTap
           : key != null
@@ -90,6 +92,7 @@ class HtmlParser extends StatelessWidget {
       customRender.keys.toList(),
       tagsList,
       navigationDelegateForIframe,
+      context,
     );
     StyledElement? externalCssStyledTree;
     if (declarations.isNotEmpty) {
@@ -104,7 +107,7 @@ class HtmlParser extends StatelessWidget {
         buildContext: context,
         parser: this,
         tree: cleanedTree,
-        style: Style.fromTextStyle(Theme.of(context).textTheme.bodyText2!),
+        style: cleanedTree.style,
       ),
       cleanedTree,
     );
@@ -122,8 +125,9 @@ class HtmlParser extends StatelessWidget {
           buildContext: context,
           parser: this,
           tree: cleanedTree,
-          style: Style.fromTextStyle(Theme.of(context).textTheme.bodyText2!),
+          style: cleanedTree.style,
         ),
+        selectionControls: selectionControls,
       );
     }
     return StyledText(
@@ -134,7 +138,7 @@ class HtmlParser extends StatelessWidget {
         buildContext: context,
         parser: this,
         tree: cleanedTree,
-        style: Style.fromTextStyle(Theme.of(context).textTheme.bodyText2!),
+        style: cleanedTree.style,
       ),
     );
   }
@@ -155,12 +159,13 @@ class HtmlParser extends StatelessWidget {
     List<String> customRenderTags,
     List<String> tagsList,
     NavigationDelegate? navigationDelegateForIframe,
+    BuildContext context,
   ) {
     StyledElement tree = StyledElement(
       name: "[Tree Root]",
       children: <StyledElement>[],
       node: html.documentElement,
-      style: Style(),
+      style: Style.fromTextStyle(Theme.of(context).textTheme.bodyText2!),
     );
 
     html.nodes.forEach((node) {
@@ -240,9 +245,11 @@ class HtmlParser extends StatelessWidget {
 
   static StyledElement _applyExternalCss(Map<String, Map<String, List<css.Expression>>> declarations, StyledElement tree) {
     declarations.forEach((key, style) {
-      if (tree.matchesSelector(key)) {
-        tree.style = tree.style.merge(declarationsToStyle(style));
-      }
+      try {
+        if (tree.matchesSelector(key)) {
+          tree.style = tree.style.merge(declarationsToStyle(style));
+        }
+      } catch (_) {}
     });
 
     tree.children.forEach((e) => _applyExternalCss(declarations, e));
@@ -342,7 +349,8 @@ class HtmlParser extends StatelessWidget {
     }
 
     //Return the correct InlineSpan based on the element type.
-    if (tree.style.display == Display.BLOCK && tree.children.isNotEmpty) {
+    if (tree.style.display == Display.BLOCK &&
+        (tree.children.isNotEmpty || tree.element?.localName == "hr")) {
       if (newContext.parser.selectable) {
         return TextSpan(
           style: newContext.style.generateTextStyle(),
@@ -1049,6 +1057,7 @@ class StyledText extends StatelessWidget {
   final RenderContext renderContext;
   final AnchorKey? key;
   final bool _selectable;
+  final TextSelectionControls? selectionControls;
 
   const StyledText({
     required this.textSpan,
@@ -1056,6 +1065,7 @@ class StyledText extends StatelessWidget {
     this.textScaleFactor = 1.0,
     required this.renderContext,
     this.key,
+    this.selectionControls,
   }) : _selectable = false,
         super(key: key);
 
@@ -1065,6 +1075,7 @@ class StyledText extends StatelessWidget {
     this.textScaleFactor = 1.0,
     required this.renderContext,
     this.key,
+    this.selectionControls
   }) : textSpan = textSpan,
         _selectable = true,
         super(key: key);
@@ -1079,6 +1090,7 @@ class StyledText extends StatelessWidget {
         textDirection: style.direction,
         textScaleFactor: textScaleFactor,
         maxLines: style.maxLines,
+        selectionControls: selectionControls,
       );
     }
     return SizedBox(
